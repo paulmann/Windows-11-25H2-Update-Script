@@ -1,4 +1,3 @@
-```markdown
 # Upgrade-Win11-To-25H2.ps1
 
 A reliable, production-ready PowerShell module to automate upgrading Windows 11 from 24H2 to 25H2 via the official enablement package (KB5054156). Features architecture detection, signature validation, BITS download with retry logic, silent installation, configurable reboot behavior, and transcript logging.
@@ -9,6 +8,8 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 - [Features](#features)  
 - [Requirements](#requirements)  
 - [Installation](#installation)  
+  - [Using Git](#using-git)  
+  - [Without Git](#without-git)  
 - [Setup](#setup)  
   - [Administrator Privileges](#administrator-privileges)  
   - [Execution Policy](#execution-policy)  
@@ -46,28 +47,47 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 
 ## Installation
 
-You can obtain the script in one of two ways:
+### Using Git
 
-1. **Using Git** (if installed):
-   ```
-   git clone https://github.com/paulmann/Windows-11-25H2-Update-Script.git
-   cd Windows-11-25H2-Update-Script
-   ```
-   This requires Git for Windows (https://git-scm.com/download/win).
+If you have Git for Windows installed:
 
-2. **Without Git** (PowerShell or CMD download):
-   - **PowerShell**:
-     ```
-     $rawUrl = 'https://raw.githubusercontent.com/paulmann/Windows-11-25H2-Update-Script/main/Upgrade-Win11-To-25H2.ps1'
-     Invoke-WebRequest -Uri $rawUrl -OutFile '.\Upgrade-Win11-To-25H2.ps1'
-     ```
-   - **CMD** (using built-in `bitsadmin`):
-     ```
-     bitsadmin /transfer "GetScript" /download /priority normal ^
-       https://raw.githubusercontent.com/paulmann/Windows-11-25H2-Update-Script/main/Upgrade-Win11-To-25H2.ps1 ^
-       %CD%\Upgrade-Win11-To-25H2.ps1
-     ```
-After download, ensure `Upgrade-Win11-To-25H2.ps1` is in your working directory.
+```
+# Clone the repository via HTTPS
+git clone https://github.com/paulmann/Windows-11-25H2-Update-Script.git
+# Change to script directory
+Set-Location .\Windows-11-25H2-Update-Script
+```
+
+### Without Git
+
+If Git is not available, download and extract ZIP via PowerShell or CMD:
+
+```
+# Define variables
+$zipUrl   = 'https://github.com/paulmann/Windows-11-25H2-Update-Script/archive/refs/heads/main.zip'
+$zipPath  = "$env:TEMP\Win11Update.zip"
+$destPath = "$env:USERPROFILE\Downloads\Windows-11-25H2-Update-Script"
+
+# Download repository ZIP
+Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+
+# Extract to destination folder
+Expand-Archive -Path $zipPath -DestinationPath $destPath -Force
+
+# Change to script directory
+Set-Location "$destPath\Windows-11-25H2-Update-Script-main"
+```
+
+Alternatively, using CMD with built-in tools:
+
+```
+curl -L -o "%TEMP%\Win11Update.zip" ^
+  "https://github.com/paulmann/Windows-11-25H2-Update-Script/archive/refs/heads/main.zip"
+powershell -Command "Expand-Archive -Path '%TEMP%\\Win11Update.zip' -DestinationPath '%USERPROFILE%\\Downloads\\Windows-11-25H2-Update-Script' -Force"
+cd "%USERPROFILE%\Downloads\Windows-11-25H2-Update-Script\Windows-11-25H2-Update-Script-main"
+```
+
+After installation or extraction, ensure `Upgrade-Win11-To-25H2.ps1` is in your current directory.
 
 ## Setup
 
@@ -119,13 +139,13 @@ By default, the script will:
 
 ### Parameters
 
-| Parameter        | Type                 | Default  | Description                                                             |
-|------------------|----------------------|----------|-------------------------------------------------------------------------|
-| `-Reboot`        | `[RebootOption]`     | `Prompt` | Reboot behavior after installation. Options: `Prompt`, `Force`, `None`. |
-| `-NoRestart`     | `[switch]`           | `False`  | Suppresses reboot entirely. Equates to `-Reboot None`.                  |
-| `-ForceReboot`   | `[switch]`           | `False`  | Forces immediate reboot on success. Equates to `-Reboot Force`.         |
-| `-RetryCount`    | `[int]`              | `3`      | Number of download retry attempts (BITS/HTTP).                          |
-| `-RetryDelaySec` | `[int]`              | `5`      | Delay in seconds between download retries.                              |
+| Parameter        | Type               | Default  | Description                                                             |
+|------------------|--------------------|----------|-------------------------------------------------------------------------|
+| `-Reboot`        | `[RebootOption]`   | `Prompt` | Reboot behavior: `Prompt`, `Force`, `None`.                             |
+| `-NoRestart`     | `[switch]`         | `False`  | Suppress reboot entirely (`-Reboot None`).                              |
+| `-ForceReboot`   | `[switch]`         | `False`  | Force immediate reboot on success (`-Reboot Force`).                    |
+| `-RetryCount`    | `[int]`            | `3`      | Number of download retry attempts.                                      |
+| `-RetryDelaySec` | `[int]`            | `5`      | Delay in seconds between retries.                                       |
 
 ### Examples
 
@@ -190,4 +210,3 @@ Contributions welcome! Submit pull requests for:
 ## License
 
 Released under the [MIT License](LICENSE).  
-```
