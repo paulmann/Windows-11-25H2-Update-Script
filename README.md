@@ -8,16 +8,19 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 2. [Features](#2-features)  
 3. [Requirements](#3-requirements)  
 4. [Installation](#4-installation)  
-5. [Usage](#5-usage)  
-   5.1. [Basic Run](#51-basic-run)  
-   5.2. [Parameters](#52-parameters)  
-   5.3. [Examples](#53-examples)  
-6. [Logging](#6-logging)  
-7. [Error Handling](#7-error-handling)  
-8. [Contributing](#8-contributing)  
-9. [License](#9-license)  
+5. [Setup](#5-setup)
+   5.1. [Administrator Privileges](#51-administrator-privileges)
+   5.2. [Execution Policy](#52-execution-policy)
+6. [Usage](#6-usage)  
+   6.1. [Basic Run](#61-basic-run)  
+   6.2. [Parameters](#62-parameters)  
+   6.3. [Examples](#63-examples)  
+7. [Logging](#7-logging)  
+8. [Error Handling](#8-error-handling)  
+9. [Contributing](#9-contributing)  
+10. [License](#10-license)  
 
-***
+---
 
 ## 1. Introduction
 
@@ -44,14 +47,47 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 
 1. Clone or download this repository.  
 2. Place `Upgrade-Win11-To-25H2.ps1` in your desired scripts folder.  
-3. Ensure your PowerShell execution policy permits running unsigned scripts:  
-   ```powershell
-   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-   ```
 
-## 5. Usage
+## 5. Setup
 
-### 5.1. Basic Run
+### 5.1. Administrator Privileges
+
+**This script MUST be run as Administrator** to install the Windows update. Right-click on PowerShell and select "Run as Administrator" or use one of these methods:
+
+**Method 1: Windows Terminal**
+1. Open Windows Terminal as Administrator
+2. Navigate to the script directory
+3. Run the script
+
+**Method 2: Command Line**
+```cmd
+powershell.exe -Command "Start-Process PowerShell -Verb RunAs"
+```
+
+### 5.2. Execution Policy
+
+If you encounter the error "execution of scripts is disabled on this system", you need to adjust the PowerShell execution policy.
+
+#### Option 1: One-time bypass (Recommended for security)
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File ".\Upgrade-Win11-To-25H2.ps1"
+```
+
+#### Option 2: Set policy for current user
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+#### Option 3: Temporary session policy
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+```
+
+**Security Note:** `RemoteSigned` allows locally created scripts to run without a signature while requiring signatures for downloaded scripts. This provides a good balance of security and usability.
+
+## 6. Usage
+
+### 6.1. Basic Run
 
 Open PowerShell **as Administrator** and execute:
 
@@ -61,13 +97,14 @@ Open PowerShell **as Administrator** and execute:
 
 By default, the script will:
 1. Validate environment and OS version.  
-2. Detect or prompt for architecture.  
-3. Download KB5054156.  
-4. Verify the MSU signature.  
-5. Install the update silently.  
-6. Prompt to reboot when complete.
+2. Check if system already has Windows 11 25H2.
+3. Detect or prompt for architecture.  
+4. Download KB5054156.  
+5. Verify the MSU signature.  
+6. Install the update silently.  
+7. Prompt to reboot when complete.
 
-### 5.2. Parameters
+### 6.2. Parameters
 
 | Parameter      | Type                   | Default                 | Description                                                                              |
 |----------------|------------------------|-------------------------|------------------------------------------------------------------------------------------|
@@ -77,7 +114,7 @@ By default, the script will:
 | `-RetryCount`  | `[int]`                | `3`                     | Number of download retry attempts (BITS/HTTP).                                           |
 | `-RetryDelaySec`| `[int]`               | `5`                     | Delay in seconds between download retries.                                               |
 
-### 5.3. Examples
+### 6.3. Examples
 
 1. **Default behavior (prompt to reboot)**  
    ```powershell
@@ -99,7 +136,12 @@ By default, the script will:
    .\Upgrade-Win11-To-25H2.ps1 -RetryCount 5 -RetryDelaySec 10
    ```
 
-## 6. Logging
+5. **One-time execution with policy bypass**
+   ```powershell
+   powershell.exe -ExecutionPolicy Bypass -File ".\Upgrade-Win11-To-25H2.ps1" -ForceReboot
+   ```
+
+## 7. Logging
 
 All script actions and output are recorded via `Start-Transcript` to:
 ```
@@ -107,18 +149,19 @@ C:\ProgramData\Win11-25H2\Upgrade25H2_<Timestamp>.log
 ```
 Use these logs for auditing, troubleshooting download or installation failures.
 
-## 7. Error Handling
+## 8. Error Handling
 
 - The script throws descriptive errors if:
   - Not run as Administrator.  
   - Execution policy blocks script.  
-  - OS build or UBR is unsupported.  
+  - OS build or UBR is unsupported.
+  - System already has Windows 11 25H2 or later.
   - Download fails after retries.  
   - MSU signature is invalid.  
   - WUSA exit code is non-zero.  
 - Errors are written via `Write-Error` and the script exits with code 1.
 
-## 8. Contributing
+## 9. Contributing
 
 Contributions welcome! Please submit pull requests for:
 - Bug fixes  
@@ -131,6 +174,6 @@ Follow standard GitHub workflow:
 3. Commit changes with clear messages  
 4. Open a pull request  
 
-## 9. License
+## 10. License
 
 Released under the [MIT License](LICENSE).
