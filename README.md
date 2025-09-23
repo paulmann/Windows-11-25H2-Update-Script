@@ -9,8 +9,7 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 3. [Requirements](#3-requirements)  
 4. [Installation](#4-installation)  
 5. [Setup](#5-setup)
-   5.1. [Administrator Privileges](#51-administrator-privileges)
-   5.2. [Execution Policy](#52-execution-policy)
+   [ [Administrator Privileges](#51-administrator-privileges) ] [ [Execution Policy](#52-execution-policy) ]
 7. [Usage](#6-usage)  
    6.1. [Basic Run](#61-basic-run)  
    6.2. [Parameters](#62-parameters)  
