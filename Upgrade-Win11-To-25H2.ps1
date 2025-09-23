@@ -1,4 +1,3 @@
-```powershell
 <#
 .SYNOPSIS
     Reliable upgrade script for Windows 11 24H2 → 25H2 (eKB KB5054156).
@@ -244,4 +243,4 @@ elseif ($ForceReboot) { $Reboot = [Win11.Upgrade.RebootOption]::Force }
 $manager = [Win11.Upgrade.UpgradeManager]::new($Reboot, $RetryCount, $RetryDelaySec)
 $manager.Run()
 #endregion
-```
+
