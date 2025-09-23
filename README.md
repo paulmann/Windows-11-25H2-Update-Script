@@ -50,6 +50,7 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 
 ## 5. Setup
 
+
 ### 5.1. Administrator Privileges
 
 **This script MUST be run as Administrator** to install the Windows update. Right-click on PowerShell and select "Run as Administrator" or use one of these methods:
@@ -63,6 +64,7 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 ```cmd
 powershell.exe -Command "Start-Process PowerShell -Verb RunAs"
 ```
+
 
 ### 5.2. Execution Policy
 
