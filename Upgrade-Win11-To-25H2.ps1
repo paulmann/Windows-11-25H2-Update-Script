@@ -40,6 +40,10 @@ param(
     [int]$RetryDelaySec = 5
 )
 
+# Set UTF-8 encoding for proper symbol display
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 #region Constants
 $Script:TargetBuild = 26200
 $Script:TargetUbr = 6718
@@ -71,6 +75,45 @@ function Write-Log {
     $formattedMessage = "[$timestamp] [$Level] $Message"
     
     Write-Host $formattedMessage -ForegroundColor $Color
+}
+
+function Write-ErrorPretty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Title,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$Description,
+        
+        [string]$ErrorCode = $null,
+        [string]$Recommendations = $null
+    )
+    
+    # Title in red
+    Write-Host "`n[ERROR] " -NoNewline -ForegroundColor Red
+    Write-Host $Title -ForegroundColor Red
+    
+    if ($ErrorCode) {
+        Write-Host "   Error Code: " -NoNewline -ForegroundColor DarkGray
+        Write-Host $ErrorCode -ForegroundColor Yellow
+    }
+    
+    # Description in cyan
+    Write-Host "   Description: " -NoNewline -ForegroundColor DarkGray
+    Write-Host $Description -ForegroundColor Cyan
+    
+    if ($Recommendations) {
+        Write-Host "`n   Recommendations:" -ForegroundColor DarkGray
+        $recLines = $Recommendations -split "`n"
+        foreach ($line in $recLines) {
+            if ($line.Trim() -ne "") {
+                Write-Host "     - " -NoNewline -ForegroundColor DarkGray
+                Write-Host $line.Trim() -ForegroundColor White
+            }
+        }
+    }
+    
+    Write-Host ""
 }
 
 function Test-Administrator {
@@ -220,6 +263,62 @@ function Test-FileSignature {
     Write-Log "Signature validation successful" -Color Green -Level Success
 }
 
+function Get-ExitCodeMessage {
+    param([int]$ExitCode)
+    
+    $errorMessages = @{
+        0 = @{
+            Title = "Installation completed successfully"
+            Type = "Success"
+        }
+        3010 = @{
+            Title = "Installation completed successfully"
+            Description = "A reboot is required to finalize the update"
+            Type = "Warning"
+        }
+        2359302 = @{
+            Title = "Update not applicable"
+            Description = "This update cannot be installed on your system"
+            Details = "The update is already installed, your system has a newer version, or prerequisites are missing"
+            Recommendations = @(
+                "Check Windows Update history to see if this update is already installed",
+                "Run 'winver' to verify your current Windows version", 
+                "Check if newer updates are available via Windows Update"
+            )
+            Type = "Error"
+        }
+        2359303 = @{
+            Title = "Installation in progress"
+            Description = "Another installation is already in progress"
+            Recommendations = @("Wait for current installation to complete and try again")
+            Type = "Error"
+        }
+        2359299 = @{
+            Title = "Update not applicable"
+            Description = "The update is not applicable to your computer"
+            Type = "Error"
+        }
+        2147943458 = @{
+            Title = "Access denied"
+            Description = "Administrator privileges required"
+            Recommendations = @("Run PowerShell as Administrator")
+            Type = "Error"
+        }
+    }
+    
+    if ($errorMessages.ContainsKey($ExitCode)) {
+        return $errorMessages[$ExitCode]
+    }
+    else {
+        return @{
+            Title = "Installation failed"
+            Description = "Unknown error occurred during installation"
+            Details = "Exit code: $ExitCode"
+            Type = "Error"
+        }
+    }
+}
+
 function Install-UpdatePackage {
     param([Parameter(Mandatory = $true)][string]$MsuPath)
     
@@ -228,17 +327,38 @@ function Install-UpdatePackage {
     $arguments = "`"$MsuPath`" /quiet /norestart"
     $process = Start-Process -FilePath 'wusa.exe' -ArgumentList $arguments -Wait -PassThru
     
+    Write-Log "wusa.exe completed with exit code: $($process.ExitCode)" -Color Cyan -Level Info
+    
+    $exitInfo = Get-ExitCodeMessage -ExitCode $process.ExitCode
+    
     switch ($process.ExitCode) {
         0 { 
-            Write-Log "Update installed successfully" -Color Green -Level Success 
+            Write-Log $exitInfo.Title -Color Green -Level Success 
         }
         3010 { 
-            Write-Log "Update installed successfully. Reboot required." -Color Yellow -Level Warning 
+            Write-Log $exitInfo.Title -Color Green -Level Success
+            Write-Log $exitInfo.Description -Color Yellow -Level Warning 
+        }
+        2359302 {
+            # Special handling for "not applicable" error - check if we're already on target build
+            $currentOs = Get-OSBuildInfo
+            if (Test-TargetBuild -OSInfo $currentOs) {
+                Write-Log "Update not required - system is already on target build or newer" -Color Green -Level Success
+                Write-Log "Current version: $($currentOs.CurrentBuild).$($currentOs.UBR) >= Target: $Script:TargetBuild.$Script:TargetUbr" -Color Green -Level Success
+                return 0
+            }
+            else {
+                throw "Installation failed with exit code 2359302. The update is not applicable to this system."
+            }
         }
         default { 
-            throw "Installation failed with exit code $($process.ExitCode). See Microsoft documentation for error details." 
+            if ($exitInfo.Type -eq "Error") {
+                throw "Installation failed with exit code $($process.ExitCode). $($exitInfo.Description)"
+            }
         }
     }
+    
+    return $process.ExitCode
 }
 
 function Invoke-RebootHandler {
@@ -277,20 +397,21 @@ try {
     
     # Validate prerequisites
     if (-not (Test-Administrator)) {
-        throw "Administrator privileges are required. Please run PowerShell as Administrator."
+        Write-ErrorPretty -Title "Administrator privileges required" `
+                         -Description "Please run PowerShell as Administrator" `
+                         -Recommendations "Right-click PowerShell and select 'Run as Administrator'"
+        exit 1
     }
     
     if (-not (Test-ExecutionPolicy)) {
-        throw @"
-Current execution policy blocks script execution.
-Options to resolve:
-1. One-time bypass: 
-   powershell.exe -ExecutionPolicy Bypass -File $($MyInvocation.MyCommand.Name)
-2. Set for current user:
-   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-3. Session only:
-   Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
-"@
+        Write-ErrorPretty -Title "Execution policy blocks script execution" `
+                         -Description "Current PowerShell execution policy prevents script execution" `
+                         -Recommendations @(
+                             "One-time bypass: powershell.exe -ExecutionPolicy Bypass -File $($MyInvocation.MyCommand.Name)",
+                             "Set for current user: Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned",
+                             "Session only: Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned"
+                         )
+        exit 1
     }
     
     # Get system information
@@ -299,17 +420,20 @@ Options to resolve:
     
     # Check if already on target build
     if (Test-TargetBuild -OSInfo $osInfo) {
-        Write-Log "System is already on Windows 11 25H2 or newer. No update required." -Color Green -Level Success
+        Write-Log "[SUCCESS] System is already on Windows 11 25H2 or newer. No update required." -Color Green -Level Success
+        Write-Log "   Current version: $($osInfo.CurrentBuild).$($osInfo.UBR) >= Target: $Script:TargetBuild.$Script:TargetUbr" -Color Green -Level Success
         exit 0
     }
     
     # Verify minimum requirements
     if (-not (Test-MinimumBuild -OSInfo $osInfo)) {
-        throw @"
-Unsupported Windows version: $($osInfo.DisplayVersion) Build $($osInfo.CurrentBuild).$($osInfo.UBR)
-This script requires Windows 11 24H2 (Build $Script:MinimumBuild.$Script:MinimumUbr or newer).
-Please install the latest updates before running this script.
-"@
+        Write-ErrorPretty -Title "Unsupported Windows version" `
+                         -Description "This script requires Windows 11 24H2 (Build $Script:MinimumBuild.$Script:MinimumUbr or newer)" `
+                         -Recommendations @(
+                             "Install the latest updates via Windows Update",
+                             "Ensure you are running Windows 11 24H2 or later"
+                         )
+        exit 1
     }
     
     # Determine architecture
@@ -339,20 +463,46 @@ Please install the latest updates before running this script.
     
     # Verify and install
     Test-FileSignature -FilePath $tempFile
-    Install-UpdatePackage -MsuPath $tempFile
+    $exitCode = Install-UpdatePackage -MsuPath $tempFile
     
     # Cleanup temporary file
     Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
     Write-Log "Temporary files cleaned up" -Color Green -Level Success
     
-    # Handle reboot
-    Invoke-RebootHandler -RebootBehavior $Reboot
+    # Handle reboot (only if installation was successful and not already on target)
+    $currentOsAfter = Get-OSBuildInfo
+    if (-not (Test-TargetBuild -OSInfo $currentOsAfter) -and $exitCode -eq 3010) {
+        Invoke-RebootHandler -RebootBehavior $Reboot
+    }
     
-    Write-Log "Windows 11 25H2 upgrade completed successfully" -Color Green -Level Success
+    Write-Log "[SUCCESS] Windows 11 25H2 upgrade completed successfully" -Color Green -Level Success
 }
 catch {
-    Write-Log "Error: $($_.Exception.Message)" -Color Red -Level Error
-    Write-Log "Script execution failed" -Color Red -Level Error
+    # Extract exit code from error message if possible
+    $errorMessage = $_.Exception.Message
+    Write-Log "Error encountered: $errorMessage" -Color Red -Level Error
+    
+    # Try to extract exit code from error message
+    if ($errorMessage -match 'exit code (\d+)') {
+        $exitCode = [int]$matches[1]
+        $exitInfo = Get-ExitCodeMessage -ExitCode $exitCode
+        
+        $recommendations = if ($exitInfo.Recommendations) {
+            ($exitInfo.Recommendations -join "`n")
+        } else { $null }
+        
+        Write-ErrorPretty -Title $exitInfo.Title `
+                         -Description $exitInfo.Description `
+                         -ErrorCode "0x$($exitCode.ToString('X8')) ($exitCode)" `
+                         -Recommendations $recommendations
+    }
+    else {
+        # Standard error message
+        Write-ErrorPretty -Title "Script execution failed" `
+                         -Description $errorMessage `
+                         -Recommendations "Check the log file for detailed information: $Script:LogFile"
+    }
+    
     exit 1
 }
 finally {
