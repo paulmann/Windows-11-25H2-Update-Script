@@ -70,7 +70,7 @@ function Write-ErrorPretty {
         [Parameter(Mandatory = $true)]
         [string]$Description,
         [string]$ErrorCode = $null,
-        [string]$Recommendations = $null
+        [string[]]$Recommendations = @()
     )
     Write-Host "`n[x] " -NoNewline -ForegroundColor Red
     Write-Host $Title -ForegroundColor Red
@@ -80,16 +80,15 @@ function Write-ErrorPretty {
     }
     Write-Host "   Description: " -NoNewline -ForegroundColor DarkGray
     Write-Host $Description -ForegroundColor Cyan
-    if ($Recommendations) {
-        Write-Host "`n   Recommendations:" -ForegroundColor DarkGray
-        $recLines = $Recommendations -split "`n"
-        foreach ($line in $recLines) {
-            if ($line.Trim() -ne "") {
-                Write-Host "     • " -NoNewline -ForegroundColor DarkGray
-                Write-Host $line.Trim() -ForegroundColor White
-            }
-        }
-    }
+	if ($Recommendations.Count -gt 0) {
+	    Write-Host "`n   Recommendations:" -ForegroundColor DarkGray
+	    foreach ($line in $Recommendations) {
+	        if (![string]::IsNullOrWhiteSpace($line)) {
+	            Write-Host "     • " -NoNewline -ForegroundColor DarkGray
+	            Write-Host $line.Trim() -ForegroundColor White
+        	}
+	    }
+	}
     Write-Host ""
 }
 
