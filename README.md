@@ -41,7 +41,7 @@ A reliable, production-ready PowerShell module to automate upgrading Windows 11 
 ## Requirements
 
 - Windows 11, version 24H2 (Build 26100.5074 or later)  
-- PowerShell 7+  
+- PowerShell 5.1+  
 - Administrative privileges  
 - Execution policy set to allow script execution (`Unrestricted`, `RemoteSigned`, etc.)  
 
