@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PowerShell](https://img.shields.io/badge/powershell-5.1%2B-blue.svg)](https://docs.microsoft.com/en-us/powershell/)
 [![Batch](https://img.shields.io/badge/batch-cmd-orange.svg)](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
-[![Platform](https://img.shields.io/badge/platform-Windows%207|10|11|12-blue.svg)](https://www.microsoft.com/windows/)
+[![Platform](https://img.shields.io/badge/platform-Windows%2011-blue.svg)](https://www.microsoft.com/windows/)
 
 > **A production-ready automation tool for seamlessly upgrading Windows 11 from 24H2 to 25H2 via official enablement package (KB5054156)**
 
