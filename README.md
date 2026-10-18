@@ -1,7 +1,6 @@
 # Windows 11 25H2 Update Script 🚀✨
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/paulmann/Windows-11-25H2-Update-Script)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PowerShell](https://img.shields.io/badge/powershell-5.1%2B-blue.svg)](https://docs.microsoft.com/en-us/powershell/)
 [![Batch](https://img.shields.io/badge/batch-cmd-orange.svg)](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-blue.svg)](https://www.microsoft.com/windows/)
