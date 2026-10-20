@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://paulmann.github.io/Windows-11-25H2-Update-Script/sitemap.xml
