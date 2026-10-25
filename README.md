@@ -1,13 +1,14 @@
-# Windows 11 25H2 Update Script 🚀✨
+# Windows 11 25H2 & 26H2 Update Script 🚀✨
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/paulmann/Windows-11-25H2-Update-Script)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/paulmann/Windows-11-25H2-Update-Script)
+[![26H2](https://img.shields.io/badge/26H2-KB5121794-blueviolet.svg)](#-windows-11-26h2-kb5121794)
 [![PowerShell](https://img.shields.io/badge/powershell-5.1%2B-blue.svg)](https://docs.microsoft.com/en-us/powershell/)
 [![Batch](https://img.shields.io/badge/batch-cmd-orange.svg)](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-blue.svg)](https://www.microsoft.com/windows/)
 
-> **A production-ready automation tool for seamlessly upgrading Windows 11 from 24H2 to 25H2 via official enablement package (KB5054156)**
+> **Enablement-package upgrades for Windows 11: 24H2 → 25H2 (KB5054156) and 24H2/25H2 → 26H2 (KB5121794) — one small package, one restart**
 
-Windows 11 25H2 Update Script is a robust, enterprise-grade automation solution designed to streamline the upgrade process from Windows 11 24H2 to 25H2. It supports both PowerShell and Batch file execution, automatically detects system architecture, validates digital signatures, and manages the complete upgrade workflow with comprehensive error handling and logging.
+This repository ships two enablement-package upgrade paths. **25H2** (1.0.0) upgrades 24H2 to 25H2 with KB5054156. **26H2** (1.1.0) upgrades 24H2 *or* 25H2 straight to 26H2 with KB5121794. Both come as a full PowerShell implementation and a reduced `cmd.exe` alternative, detect the architecture (including the `ARM 64-bit Processor` case), validate the package with SHA-1 and Authenticode, and keep transcripts. The 26H2 pair additionally refuses LTSC and server editions, supports a true read-only `-WhatIf`, and ships 57 Pester tests. The 25H2 scripts are unchanged.
 
 ## ⚡ Quick Start
 
@@ -37,6 +38,21 @@ Upgrade-Win11-To-25H2.bat
 git clone https://github.com/paulmann/Windows-11-25H2-Update-Script.git
 cd Windows-11-25H2-Update-Script
 Upgrade-Win11-To-25H2.bat
+```
+
+### 26H2: from 24H2 or 25H2 (New in 1.1.0)
+```powershell
+# Read-only preflight: prints build, edition, architecture, package and target; writes nothing
+.\Upgrade-Win11-To-26H2.ps1 -WhatIf
+
+# Install and leave the single restart for the maintenance window
+.\Upgrade-Win11-To-26H2.ps1 -Reboot None
+```
+
+```cmd
+REM Or the cmd.exe alternative
+Upgrade-Win11-To-26H2.bat /whatif
+Upgrade-Win11-To-26H2.bat
 ```
 
 ## 📋 Table of Contents
@@ -72,6 +88,14 @@ Upgrade-Win11-To-25H2.bat
   - [Common Issues](#common-issues)
   - [Error Codes](#error-codes)
   - [Diagnostic Commands](#diagnostic-commands)
+- [🆕 Windows 11 26H2 (KB5121794)](#-windows-11-26h2-kb5121794)
+  - [Which Script Do I Need?](#which-script-do-i-need)
+  - [Requirements and Gates (26H2)](#requirements-and-gates-26h2)
+  - [Usage (26H2)](#usage-26h2)
+  - [Parameters (26H2)](#parameters-26h2)
+  - [Exit Codes Mean "Staged"](#exit-codes-mean-staged)
+  - [Tests](#tests)
+  - [Package Verification (26H2)](#package-verification-26h2)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 - [👨‍💻 Author & Support](#-author--support)
@@ -635,6 +659,118 @@ sc query BITS                   # BITS service status
 sc query wuauserv              # Windows Update service
 ```
 
+## 🆕 Windows 11 26H2 (KB5121794)
+
+Added in **1.1.0**. Windows 11 24H2, 25H2 and 26H2 share one core operating system and the same
+monthly updates, so the enablement-package mechanism works one version further: **KB5121794** is a
+~174 KB "master switch" that turns 26H2 on with a single restart.
+
+### Which Script Do I Need?
+
+| Host | Script | Package | Result |
+|---|---|---|---|
+| 24H2 → 25H2 | `Upgrade-Win11-To-25H2.ps1` / `.bat` | KB5054156 | 26200.x |
+| 24H2 → 26H2 | `Upgrade-Win11-To-26H2.ps1` / `.bat` | KB5121794 | 26300.x |
+| 25H2 → 26H2 | `Upgrade-Win11-To-26H2.ps1` / `.bat` | KB5121794 | 26300.x |
+| already 26H2 (26300.x) | either 26H2 script | — | "already at target", exit 0 |
+| 26H1 (28000+) / LTSC / Server | none | — | refused: not an in-place path or not in the Applies To list |
+
+24H2 can go **straight to 26H2**; there is no need to pass through 25H2 first.
+
+### Requirements and Gates (26H2)
+
+| Gate | Rule |
+|---|---|
+| Version | 24H2 build **26100.9546+** or 25H2 build **26200.9550+** (KB5124010 or later) |
+| Edition | Home, Pro, Enterprise, Education, Enterprise multi-session, IoT Enterprise — **not LTSC, not Windows Server** |
+| Architecture | AMD64 or ARM64; ARM is matched first, so `ARM 64-bit Processor` is not mistaken for x64 |
+| Target | any **26300.x** is 26H2; build 28000+ (26H1) is refused before anything else |
+| Package | pinned Microsoft delivery-CDN URL; SHA-1 fingerprint from the file name plus Authenticode signature; 100,000-byte sanity floor |
+
+There is no execution-policy gate: a policy that would block the script prevents it from starting,
+and the effective policy is logged for diagnostics.
+
+### Usage (26H2)
+
+```powershell
+# Read-only preflight: no directory, no transcript, no download
+.\Upgrade-Win11-To-26H2.ps1 -WhatIf
+
+# Install and defer the restart to the maintenance window
+.\Upgrade-Win11-To-26H2.ps1 -Reboot None
+
+# Interactive restart after a successful install (default)
+.\Upgrade-Win11-To-26H2.ps1
+
+# Force a restart, or tune the download retries
+.\Upgrade-Win11-To-26H2.ps1 -Reboot Force
+.\Upgrade-Win11-To-26H2.ps1 -RetryCount 5 -RetryDelaySec 15
+
+# Unknown architecture string, or unattended -WhatIf on such a host
+.\Upgrade-Win11-To-26H2.ps1 -Architecture ARM64 -WhatIf
+
+# Air-gapped host: local package; the file name must carry KB5121794 and the right architecture
+.\Upgrade-Win11-To-26H2.ps1 -PackagePath C:\Packages\Windows11.0-KB5121794-x64_5e20a3cce48d6611b16bdec42b07167f5456586a.msu
+```
+
+Batch alternative (elevated Command Prompt): `Upgrade-Win11-To-26H2.bat [/whatif]`. It applies the
+same gates, retries 3 times 5 seconds apart, tries `curl.exe` and then `pwsh`/`powershell` inside each
+attempt, checks the SHA-1 with `certutil`, and always asks before restarting. It does not check
+Authenticode and keeps no transcript, so the PowerShell version is the safer choice.
+
+### Parameters (26H2)
+
+| Parameter | Values | Default | Effect |
+|---|---|---|---|
+| `-Reboot` | `Prompt`, `Force`, `None` | `Prompt` | reboot behaviour after a successful install |
+| `-RetryCount` | 1-10 | 3 | download attempts; each tries BITS (if present) then HTTP |
+| `-RetryDelaySec` | 1-60 | 5 | seconds between attempts |
+| `-Architecture` | `Auto`, `AMD64`, `ARM64` | `Auto` | force a package; needed for `-WhatIf` when detection fails |
+| `-PackagePath` | path to an MSU | none | local package; name must carry `KB5121794` and match the architecture |
+| `-WhatIf` | switch | off | read-only preflight: no files, no download, no install |
+
+### Exit Codes Mean "Staged"
+
+The 26H2 script exits `0` when the package was **accepted and staged**, or when there was nothing to
+do, and `1` on every failure. `3010` is folded into `0`, and the build does **not** change until the
+restart: verify `CurrentBuild = 26300` (and `DisplayVersion = 26H2`) after the restart before
+recording a host as upgraded. A deployment tool must not treat `0` alone as proof.
+
+### Tests
+
+```powershell
+Invoke-Pester -Path .\tests -Output Detailed
+```
+
+57 Pester tests: unit checks of the gates, per-ladder floors, architecture resolution, package
+identity, package verification and exit-code mapping, plus fixture runs of the observable paths. The
+fixtures force their branch inside a copy of the script (target build 1, raised minimum, 26H1
+override, faked edition) and assert the absence of download/install markers, so the suite is safe and
+meaningful on **any** Windows host. Windows-only; PowerShell 7 + Pester 5.1 or later.
+
+### Package Verification (26H2)
+
+| Architecture | Size (bytes) | SHA-1 |
+|---|---|---|
+| x64 (AMD64) | 177,535 | `5e20a3cce48d6611b16bdec42b07167f5456586a` |
+| ARM64 | 178,969 | `77a76caf2d362bb293a4d18058388f2717365abe` |
+
+```text
+x64:   https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/94520a88-858f-4832-a57d-7211f6d84a4e/public/Windows11.0-KB5121794-x64_5e20a3cce48d6611b16bdec42b07167f5456586a.msu
+ARM64: https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/9d8dc3d0-9cbf-4eb1-9411-722e3e6a19b3/public/Windows11.0-KB5121794-arm64_77a76caf2d362bb293a4d18058388f2717365abe.msu
+```
+
+Both were downloaded and verified on 2026-10-25: SHA-1 matches the fingerprint published in the file
+name and the Authenticode signature is Microsoft Corporation. The package is delivered through
+Windows Update and WSUS (product "Windows 11", classification "Upgrades") and is **not** offered in
+the [Microsoft Update Catalog](https://www.catalog.update.microsoft.com/Search.aspx?q=KB5121794),
+which is why the URLs are pinned; if they ever stop working, use `-PackagePath` with a stored copy.
+
+**26H2 limits:** no rollback or uninstall; the edition gate reads two registry values, so a renamed
+SKU can pass; the 26H2 script was executed only on PowerShell 7.6.6 (the file is accepted by the
+Windows PowerShell 5.1 parser); the install path was not executed during development — the decision
+paths, the download/verification chain and both package files were.
+
 ## 🤝 Contributing
 
 We welcome contributions! Here's how to get involved:
@@ -716,6 +852,12 @@ This project is licensed under the **PolyForm Noncommercial License 1.0.0** - se
 
 ### Version History
 
+- **v1.1.0** (2026-10-25):
+  - ✅ Added Windows 11 **26H2** support (enablement package **KB5121794**) for 24H2 and 25H2 hosts: `Upgrade-Win11-To-26H2.ps1` and `Upgrade-Win11-To-26H2.bat`
+  - ✅ Edition gate (LTSC editions and Windows Server refused), per-ladder prerequisite floor (24H2 26100.9546, 25H2 26200.9550), 26H1 refusal
+  - ✅ Real `-WhatIf` preflight (writes nothing, refuses instead of prompting), staged-vs-verified exit-code contract
+  - ✅ Local package identity check (`KB5121794` + architecture), BITS job cleanup, batch download fallback inside each attempt
+  - ✅ 57 Pester tests, safe on any host, covering every gate and the package verification
 - **v1.0.0** (2025-10-01):
   - ✅ Initial PowerShell version with full feature set
   - ✅ Added Batch file alternative for ExecutionPolicy-free deployment  
@@ -733,6 +875,7 @@ This project is licensed under the **PolyForm Noncommercial License 1.0.0** - se
 | **Comprehensive Logging** | ⚠️ PS Only | ✅ | ⚠️ | ✅ |
 | **Parameter Support** | ⚠️ PS Only | ✅ | ❌ | ✅ |
 | **Progress Reporting** | 🚧 Basic | ⚠️ | ⚠️ | ✅ |
+| **26H2 (KB5121794)** | ✅ Complete | ✅ | ✅ | ✅ |
 | **Rollback Support** | ❌ Planned | 🚧 | 🚧 | 🚧 |
 | **Proxy Support** | ❌ Planned | 🚧 | 🚧 | 🚧 |
 

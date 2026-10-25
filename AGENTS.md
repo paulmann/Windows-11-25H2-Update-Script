@@ -1,13 +1,13 @@
-# AGENTS.md — Windows 11 25H2 Update Script 1.0.0
+# AGENTS.md — Windows 11 25H2 & 26H2 Update Script 1.1.0
 
 Agent-facing guide: how to install Windows 11 25H2 Update Script, run it, and report problems responsibly.
 Human documentation: [README.md](README.md). License: [LICENSE](LICENSE).
 
-> Verified against repository state on 2026-10-22. Version covered: 1.0.0 (README badge and version history; the tree has no VERSION file).
+> Verified against repository state on 2026-10-25. Version covered: 1.1.0 (README badge and version history; the tree has no VERSION file). The 25H2 scripts and this document's 25H2 sections were verified on 2026-10-22 against 1.0.0; the 26H2 pair was added and verified on 2026-10-25.
 
 ## 1. What it is
 
-Two scripts that enable Windows 11 25H2 on a Windows 11 24H2 host by installing the official enablement package KB5054156 (build 26100.5074+ to 26200.6718) and then rebooting. The PowerShell script is the full implementation; the batch file is a reduced `cmd.exe` alternative. Neither is a general feature-update downloader, and neither uninstalls or rolls back the package.
+Two scripts that enable Windows 11 25H2 on a Windows 11 24H2 host by installing the official enablement package KB5054156 (a second pair for 26H2, KB5121794, was added in 1.1.0 - see "26H2 upgrade path" below) (build 26100.5074+ to 26200.6718) and then rebooting. The PowerShell script is the full implementation; the batch file is a reduced `cmd.exe` alternative. Neither is a general feature-update downloader, and neither uninstalls or rolls back the package.
 
 | | |
 |---|---|
@@ -135,6 +135,40 @@ Known gap: the PowerShell script falls back to HTTP only when the BITS service i
 - `Upgrade-Win11-To-25H2.bat` - architecture detection (37-50), download and fallback (89-100), 100000-byte size check (108-115), `wusa.exe` call (122), reboot prompt (130-141), exit with the `wusa.exe` result (146).
 - `LICENSE` - PolyForm Noncommercial 1.0.0.
 - Verified on Windows 11 with PowerShell 7.6.6 by reading the source and parsing the parameter block; the scripts were not executed because they install an update and can reboot the host. `gh release list` and `git tag` return nothing.
+
+## 26H2 upgrade path (added in 1.1.0)
+
+Windows 11 26H2 is a second enablement-package step on the same 26100/26200 core. Files:
+`Upgrade-Win11-To-26H2.ps1` (authoritative), `Upgrade-Win11-To-26H2.bat` (reduced `cmd.exe`
+alternative) and `tests\` (57 Pester tests). The 25H2 scripts above are unchanged.
+
+| | |
+|---|---|
+| Target | 26H2 = build 26300 (any 26300.x counts); enablement package KB5121794, ~174 KB, one restart |
+| From | 24H2 26100.9546+ or 25H2 26200.9550+ (KB5124010 or a later cumulative update) |
+| Refused | 26H1 (build 28000+), LTSC edition IDs (`EnterpriseS`, `IoTEnterpriseS`, ...), Windows Server |
+| Parameters | `-Reboot`, `-RetryCount`, `-RetryDelaySec`, `-Architecture`, `-PackagePath`, `-WhatIf` |
+| Writes | `%ProgramData%\Win11-26H2\Upgrade_*.log` transcript (skipped with `-WhatIf`, or if transcription cannot start) and `%TEMP%\kb5121794_<ARCH>.msu` (removed after the run); the OS via `wusa.exe` |
+| Network | HTTPS 443 to `catalog.sf.dl.delivery.mp.microsoft.com` only; BITS then HTTP on every attempt |
+| Exit codes | `0` = package staged or nothing to do, `1` = every failure. `0` is not proof: verify `CurrentBuild = 26300` after the restart |
+
+Notes for agents:
+
+- `-WhatIf` writes nothing at all (no directory, no transcript, no download) and refuses instead of
+  prompting when the architecture is unknown - pass `-Architecture` in that case.
+- `-PackagePath` requires a file name containing `KB5121794` with the matching architecture token.
+  The SHA-1 check is skipped for local files (the fingerprint belongs to the catalog copy); the
+  Authenticode check still runs.
+- The batch variant has no Authenticode check and no transcript, and falls back from `curl.exe` to
+  `pwsh`/`powershell` inside each of its 3 attempts.
+- The package is absent from the Microsoft Update Catalog, so the pinned delivery-CDN URLs are
+  load-bearing and can rot; `-PackagePath` with a stored copy is the mitigation.
+- Tests: `Invoke-Pester -Path .\tests -Output Detailed` (Windows-only, PowerShell 7 + Pester 5.1+).
+  The fixtures force their branch and assert the absence of download/install markers, so the suite is
+  safe on any host - it must never be rewritten to depend on the host already being 26H2.
+- Verification status: decision paths, download/verification chain and both package files were tested;
+  the install path was **not** executed. The script is accepted by the Windows PowerShell 5.1 parser
+  but was executed only on PowerShell 7.6.6.
 
 ## Help the project — through evidence, not engagement
 
